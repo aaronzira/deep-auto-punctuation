@@ -39,9 +39,9 @@ class GruRNN(nn.Module):
             return Variable(torch.zeros(self.layers * self.bi_mul, self.batch_size, self.hidden_size))
 
 
-class Engadget():
+class Model():
     def __init__(self, model, char2vec=None, output_char2vec=None):
-        print('****** Engadget Model Initialize ******')
+        print('****** Initializing Model ******')
         self.model = model
         if char2vec is None:
             self.char2vec = Char2Vec()
@@ -60,7 +60,7 @@ class Engadget():
         self.hidden = self.model.init_hidden(random)
         return self
 
-    def save(self, fn="GRU_Engadget.tar"):
+    def save(self, fn):
         torch.save({
             "hidden": self.hidden,
             "state_dict": self.model.state_dict(),
