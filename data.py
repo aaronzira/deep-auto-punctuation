@@ -8,19 +8,18 @@ def get_content(fn):
             source += line
     return source
 
-
-def source_gen(path="./engadget_data/", start=None, end=None):
+def source_gen(path, start=None, end=None):
     child, folders, files = list(os.walk(path))[0]
-    for fn in sorted(files, key=lambda fn: os.path.getsize(path + fn)):
+    for fn in sorted(files, key=lambda fn: os.path.getsize(os.path.join(path, fn))):
         if fn[0] is ".":
             pass
         else:
-            src = get_content(path + fn)
+            src = get_content(os.path.join(path, fn))
             yield fn, src
 
 
-def train_gen():
-    yield from [_ for i, _ in enumerate(source_gen()) if (716 - i) % 2000 not in [1998, 1995]]
+def train_gen(path):
+    yield from [_ for i, _ in enumerate(source_gen(path)) if (716 - i) % 2000 not in [1998, 1995]]
 
 
 def validation_gen():

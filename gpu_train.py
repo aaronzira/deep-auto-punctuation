@@ -21,12 +21,13 @@ def get_labels(labels_file):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("files_path")
     parser.add_argument("--input_labels", default="input_chars.json")
     parser.add_argument("--output_labels", default="output_chars.json")
-    parser.add_argument("--batch_size", default=256)
-    parser.add_argument("--learning_rate", default=5e-5)
-    parser.add_argument("--num_layers", default=1)
-    parser.add_argument("--num_epochs", default=48)
+    parser.add_argument("--batch_size", default=256, type=int)
+    parser.add_argument("--learning_rate", default=5e-5, type=float)
+    parser.add_argument("--num_layers", default=1, type=int)
+    parser.add_argument("--num_epochs", default=48, type=int)
     parser.add_argument("--cuda", action="store_true", default=False)
     parser.add_argument("--no-bidirectional", dest="bidirectional", action="store_false", default=True)
     parser.add_argument("--model_name", default="GRU_Model", help="Model ID for saving files")
@@ -43,18 +44,18 @@ if __name__ == '__main__':
 
     cprint("input_size is: " + c(input_size, 'green') + "; ouput_size is: " + c(output_size, 'green'))
 
-    rnn = model.GruRNN(input_size, hidden_size, output_size, batch_size=args.batch_size, layers=args.num_layers, bi=args.bidirectional)
+    rnn = model.GruRNN(input_size, hidden_size, output_size, batch_size=args.batch_size, layers=args.num_layers, bi=args.bidirectional, cuda=args.cuda)
     if args.cuda:
         rnn.cuda()
 
-    text_model = model.Model(rnn, char2vec, output_char2vec)
+    text_model = model.Model(rnn, input_char2vec, output_char2vec, cuda=args.cuda)
     text_model.setup_training(args.learning_rate)
 
     seq_length = 500
 
     for epoch_num in range(args.num_epochs):
         
-        for batch_ind, (max_len, sources) in enumerate(tqdm(data.batch_gen(data.train_gen(), batch_size))):
+        for batch_ind, (max_len, sources) in enumerate(tqdm(data.batch_gen(data.train_gen(args.files_path), args.batch_size))):
             
             # prepare the input and output chunks
             input_srcs = []; punc_targs = []
@@ -86,10 +87,10 @@ if __name__ == '__main__':
                 print("=================================")
                 punctuation_output = text_model.output_chars()
                 ### added .cpu()
-                plot_progress(text_model.embeded[0,:400].data.cpu().numpy().T, 
-                              text_model.output[0,:400].data.cpu().numpy().T, 
-                              text_model.softmax[0,:400].data.cpu().numpy().T,
-                              np.array(text_model.losses))
+                ###plot_progress(text_model.embeded[0,:400].data.cpu().numpy().T, 
+                              ###text_model.output[0,:400].data.cpu().numpy().T, 
+                              ###text_model.softmax[0,:400].data.cpu().numpy().T,
+                              ###np.array(text_model.losses))
 
                 metric.print_pc(utils.flatten(punctuation_output), utils.flatten(target_))
                 print()
