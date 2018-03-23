@@ -7,7 +7,7 @@ import torch.optim as optim
 
 # Implement mini-batch
 class GruRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, batch_size=1, layers=1, bi=False):
+    def __init__(self, input_size, hidden_size, output_size, batch_size=1, layers=1, bi=False, cuda=False):
         """
         IMPORTANT: Use batch_first convention for ease of use.
                    However, the hidden layer still use batch middle convension.
@@ -24,6 +24,10 @@ class GruRNN(nn.Module):
         self.gru = nn.GRU(input_size, hidden_size, self.layers, bidirectional=bi, batch_first=True)
         self.decoder = nn.Linear(hidden_size * self.bi_mul, output_size)
         self.softmax = F.softmax
+        self.dtype = torch.FloatTensor
+        if cuda:
+                self.dtype = torch.cuda.FloatTensor
+                self.gru.cuda()
 
     def forward(self, x, hidden):
         embeded = x
@@ -34,13 +38,13 @@ class GruRNN(nn.Module):
 
     def init_hidden(self, random=False):
         if random:
-            return Variable(torch.randn(self.layers * self.bi_mul, self.batch_size, self.hidden_size))
+            return Variable(torch.randn(self.layers * self.bi_mul, self.batch_size, self.hidden_size).type(self.dtype))
         else:
-            return Variable(torch.zeros(self.layers * self.bi_mul, self.batch_size, self.hidden_size))
+            return Variable(torch.zeros(self.layers * self.bi_mul, self.batch_size, self.hidden_size).type(self.dtype))
 
 
 class Model():
-    def __init__(self, model, char2vec=None, output_char2vec=None):
+    def __init__(self, model, char2vec=None, output_char2vec=None, cuda=False):
         print('****** Initializing Model ******')
         self.model = model
         if char2vec is None:
@@ -55,6 +59,9 @@ class Model():
 
         self.loss = 0
         self.losses = []
+        self.cuda = cuda
+        self.dtype = torch.FloatTensor if not cuda else torch.cuda.FloatTensor
+        self.ttype = torch.LongTensor if not cuda else torch.cuda.LongTensor
 
     def init_hidden_(self, random=False):
         self.hidden = self.model.init_hidden(random)
@@ -77,6 +84,8 @@ class Model():
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.optimizer.zero_grad()
         self.loss_fn = nn.CrossEntropyLoss()
+        if self.cuda:
+	        self.loss_fn.cuda()
         self.init_hidden_()
 
     def reset_loss(self):
@@ -88,7 +97,7 @@ class Model():
 
         self.optimizer.zero_grad()
         self.next_(input_batch)
-        self.target_vec = Variable(self.output_char2vec.char_code_batch(target_batch))
+        self.target_vec = Variable(self.output_char2vec.char_code_batch(target_batch).type(self.ttype))
         new_loss = self.loss_fn(self.output.view(-1, self.model.output_size), self.target_vec.view(-1))
         self.loss += new_loss
 
@@ -104,7 +113,7 @@ class Model():
         self.reset_loss()
 
     def embed(self, input_data):
-        self.embeded = Variable(self.char2vec.one_hot_batch(input_data))
+        self.embeded = Variable(self.char2vec.one_hot_batch(input_data).type(self.dtype))
         return self.embeded
 
     def next_(self, input_text):
