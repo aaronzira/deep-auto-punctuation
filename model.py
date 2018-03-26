@@ -27,14 +27,15 @@ class GruRNN(nn.Module):
         self.dtype = torch.FloatTensor
         if cuda:
                 self.dtype = torch.cuda.FloatTensor
-                self.gru.cuda()
+                assert self.batch_size % torch.cuda.device_count() == 0
+                #self.gru.cuda()
 
     def forward(self, x, hidden):
         embeded = x
         gru_output, hidden = self.gru(embeded, hidden.view(self.layers * self.bi_mul, -1, self.hidden_size))
         gru_output.contiguous()
         output = self.decoder(gru_output.view(-1, self.hidden_size * self.bi_mul))
-        return output.view(self.batch_size, -1, self.output_size), hidden
+        return output.view(int(self.batch_size / torch.cuda.device_count()), -1, self.output_size), hidden
 
     def init_hidden(self, random=False):
         if random:
@@ -64,7 +65,7 @@ class Model():
         self.ttype = torch.LongTensor if not cuda else torch.cuda.LongTensor
 
     def init_hidden_(self, random=False):
-        self.hidden = self.model.init_hidden(random)
+        self.hidden = self.model.module.init_hidden(random)
         return self
 
     def save(self, fn):
@@ -98,7 +99,7 @@ class Model():
         self.optimizer.zero_grad()
         self.next_(input_batch)
         self.target_vec = Variable(self.output_char2vec.char_code_batch(target_batch).type(self.ttype))
-        new_loss = self.loss_fn(self.output.view(-1, self.model.output_size), self.target_vec.view(-1))
+        new_loss = self.loss_fn(self.output.view(-1, self.model.module.output_size), self.target_vec.view(-1))
         self.loss += new_loss
 
     def descent(self):
@@ -121,8 +122,8 @@ class Model():
         return self
 
     def output_chars(self, temperature = 1):
-        self.softmax = self.model.softmax(self.output.view(-1, self.model.output_size) / temperature
-                                          ).view(self.model.batch_size, -1, self.model.output_size)
-        indexes = torch.multinomial(self.softmax.view(-1, self.model.output_size)
-                                    ).view(self.model.batch_size, -1)
+        self.softmax = self.model.module.softmax(self.output.view(-1, self.model.module.output_size) / temperature
+                                          ).view(self.model.module.batch_size, -1, self.model.module.output_size)
+        indexes = torch.multinomial(self.softmax.view(-1, self.model.module.output_size)
+                                    ).view(self.model.module.batch_size, -1)
         return self.output_char2vec.vec2list_batch(indexes)
