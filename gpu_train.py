@@ -3,6 +3,7 @@ import json
 import numpy as np
 from termcolor import cprint, colored as c
 from tqdm import tqdm
+import torch
 
 import utils, data, metric, model
 
@@ -46,7 +47,7 @@ if __name__ == '__main__':
 
     rnn = model.GruRNN(input_size, hidden_size, output_size, batch_size=args.batch_size, layers=args.num_layers, bi=args.bidirectional, cuda=args.cuda)
     if args.cuda:
-        rnn.cuda()
+        rnn = torch.nn.DataParallel(rnn).cuda()
 
     text_model = model.Model(rnn, input_char2vec, output_char2vec, cuda=args.cuda)
     text_model.setup_training(args.learning_rate)
